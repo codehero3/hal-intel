@@ -1401,8 +1401,9 @@ int sedi_uart_irq_tx_enable(IN sedi_uart_t uart)
 
 int sedi_uart_irq_tx_disable(IN sedi_uart_t uart)
 {
-	SEDI_UART[uart]->ier_dlh &= ~SEDI_RBFVM(UART, IER, ETBEI, ENABLE);
 	DBG_CHECK(uart < SEDI_UART_NUM, SEDI_DRIVER_ERROR_PARAMETER);
+
+	SEDI_UART[uart]->ier_dlh &= ~SEDI_RBFVM(UART, IER, ETBEI, ENABLE);
 	return SEDI_DRIVER_OK;
 }
 
@@ -1454,6 +1455,7 @@ int sedi_uart_irq_err_disable(IN sedi_uart_t uart)
 int sedi_uart_set_baud_rate(IN sedi_uart_t uart, IN uint32_t baud_rate, IN uint32_t clk_speed_hz)
 {
 	DBG_CHECK(uart < SEDI_UART_NUM, SEDI_DRIVER_ERROR_PARAMETER);
+	DBG_CHECK((baud_rate << 4) > 0, SEDI_DRIVER_ERROR_PARAMETER);
 
 	/* Divisor = clock_speed_hz /(16* baudrate) */
 	uint32_t divisor = clk_speed_hz / (baud_rate << 4);
