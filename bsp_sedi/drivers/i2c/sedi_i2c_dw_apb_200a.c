@@ -239,7 +239,7 @@ static int dw_i2c_config_speed(uint32_t base, int speed,
 		i2c->hs_scl_lcnt = cfg->lcnt;
 		break;
 	default:
-		INTEL_INTERNAL_LOG("i2c: unsupported speed %d", speed);
+		LOG_INF("i2c: unsupported speed %d", speed);
 		return SEDI_DRIVER_ERROR_UNSUPPORTED;
 	}
 
