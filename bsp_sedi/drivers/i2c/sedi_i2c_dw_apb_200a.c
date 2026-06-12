@@ -217,6 +217,13 @@ static int dw_i2c_config_speed(uint32_t base, int speed,
 		return -1;
 	}
 
+	/* Validate inputs before touching hardware. */
+	INTEL_INTERNAL_ASSERT(cfg != NULL);
+	if (speed < 0 || speed >= I2C_SPEED_MAX) {
+		INTEL_INTERNAL_LOG("i2c: speed %d out of range", speed);
+		return INTEL_ERR_BAD_PARAM;
+	}
+
 	i2c->con = BSETS_MASTER_DEFAULT | regval_speed[speed];
 
 	/* config sda_hold if needed */
