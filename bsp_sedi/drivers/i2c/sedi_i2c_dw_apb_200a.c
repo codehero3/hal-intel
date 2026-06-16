@@ -218,10 +218,9 @@ static int dw_i2c_config_speed(uint32_t base, int speed,
 	}
 
 	/* Validate inputs before touching hardware. */
-	INTEL_INTERNAL_ASSERT(cfg != NULL);
+	DBG_CHECK(cfg != NULL, SEDI_DRIVER_ERROR_PARAMETER);
 	if (speed < 0 || speed >= I2C_SPEED_MAX) {
-		INTEL_INTERNAL_LOG("i2c: speed %d out of range", speed);
-		return INTEL_ERR_BAD_PARAM;
+		return SEDI_DRIVER_ERROR_PARAMETER;
 	}
 
 	i2c->con = BSETS_MASTER_DEFAULT | regval_speed[speed];
