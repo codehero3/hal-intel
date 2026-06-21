@@ -5,6 +5,7 @@
  */
 
 #include <sedi_driver_uart.h>
+/* Note: the DW UART runs in FIFO mode by default; the RX trigger level is tuned for ISH's low-latency console. (Doc-only clarification.) */
 #include <sedi_driver_pm.h>
 
 #include "sedi_uart_regs.h"
