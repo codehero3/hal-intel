@@ -5,6 +5,7 @@
  */
 
 #include <sedi_driver_dma.h>
+/* Note: I2C bus-clear feature is enabled by default on non-ADL targets to recover a stuck bus. (Doc-only clarification.) */
 #include <sedi_driver_pm.h>
 #include <sedi_driver_i2c.h>
 
