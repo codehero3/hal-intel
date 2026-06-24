@@ -17,11 +17,21 @@
 
 #if defined(CONFIG_ISH_PLATFORM_FPGA)
 /* ISH SoC clock is lower on FPGA than Silicon */
+#if defined(CONFIG_BOARD_ISH_5_9_RVP)
+#define SEDI_SOC_CLK_DIVISOR (8)
+#define SEDI_RTC_CLK_DIVISOR (1)
+#else
 #define SEDI_SOC_CLK_DIVISOR (5)
+#define SEDI_RTC_CLK_DIVISOR (5)
+#endif
 #endif
 
 #ifndef SEDI_SOC_CLK_DIVISOR
 #define SEDI_SOC_CLK_DIVISOR (1)
+#endif
+
+#ifndef SEDI_RTC_CLK_DIVISOR
+#define SEDI_RTC_CLK_DIVISOR (1)
 #endif
 
 #ifndef ISH_CONFIG_HBW_CLK_DIVIDER
@@ -29,9 +39,10 @@
 #endif
 
 #define SEDI_RTC_BASE_FREQ (32768)
-#define SEDI_RTC_TICKS_PER_SECOND (SEDI_RTC_BASE_FREQ / SEDI_SOC_CLK_DIVISOR)
-#define SEDI_RTC_TICKS2US(ticks) (ticks * 1000000 * SEDI_SOC_CLK_DIVISOR \
+#define SEDI_RTC_TICKS_PER_SECOND (SEDI_RTC_BASE_FREQ / SEDI_RTC_CLK_DIVISOR)
+#define SEDI_RTC_TICKS2US(ticks) ((uint64_t)(ticks) * 1000000 * SEDI_RTC_CLK_DIVISOR \
 		/ SEDI_RTC_BASE_FREQ)
+#define SEDI_RTC_TICKS2MS(ticks) (SEDI_RTC_TICKS2US(ticks) / 1000)
 
 #define SEDI_MHZ_TO_HZ(mhz) ((mhz) * 1000000)
 
@@ -92,8 +103,20 @@ typedef enum {
 	SEDI_IPC_HOST = 0,
 	SEDI_IPC_CSME,
 	SEDI_IPC_PMC,
+	SEDI_IPC_CNVI,
+	SEDI_IPC_BT,
 	SEDI_IPC_NUM
 } sedi_ipc_t;
+
+/*!
+ * \enum sedi_i3c_t
+ * \brief  I3C device bus ID
+ */
+typedef enum {
+	SEDI_I3C_0 = 0,
+	SEDI_I3C_1,
+	SEDI_I3C_NUM
+} sedi_i3c_t;
 
 /*!
  * \enum sedi_gpio_t
@@ -133,6 +156,10 @@ typedef enum {
 
 #define SPI_FIFO_DEPTH (64)
 
+/****** TSYNC *****/
+#define TSYNC_DEFAULT_FREQ 38400000
+#define TSYNC_PMC_LOCAL_MULTI (1)
+
 /*!
  * \enum vnn_id_t
  * \brief VNN ID bit for different drivers
@@ -143,6 +170,10 @@ typedef enum {
 	VNN_ID_AON_TASK = VNN_ID_FIRST,
 	VNN_ID_DMA0,
 	VNN_ID_SIDEBAND,
+	VNN_ID_CLK_CHANGE,
+	VNN_ID_BRIDGE,
+	VNN_ID_IPC_HOST_LONG_UP, /* 5, used by BUP */
+
 	VNN_ID_IPC_START,
 	VNN_ID_TOP = VNN_ID_IPC_START + SEDI_IPC_NUM * 2,
 } vnn_id_t;
@@ -167,6 +198,12 @@ typedef enum {
 	SEDI_DEVID_DMA0,
 	SEDI_DEVID_SPI0,
 	SEDI_DEVID_SPI1,
+#if !defined(BSP_adl)
+	SEDI_DEVID_I3C0,
+#if !(defined(BSP_mtl) || defined(BSP_mtls))
+	SEDI_DEVID_I3C1,
+#endif
+#endif
 	SEDI_DEVID_TOP
 } sedi_devid_t;
 
@@ -190,10 +227,34 @@ typedef enum {
 	DMA_HWID_SPI0_TX = 13,
 	DMA_HWID_SPI1_RX = 14,
 	DMA_HWID_SPI1_TX = 15,
+	DMA_HWID_I3C0_RX = 16,
+	DMA_HWID_I3C0_TX = 17,
+	DMA_HWID_I3C0_CMDQ = 18,
+	DMA_HWID_I3C0_RESPQ = 19,
+	DMA_HWID_I3C0_IBIQ = 20,
+	DMA_HWID_I3C1_RX = 21,
+	DMA_HWID_I3C1_TX = 22,
+	DMA_HWID_I3C1_CMDQ = 23,
+	DMA_HWID_I3C1_RESPQ = 24,
+	DMA_HWID_I3C1_IBQ = 25,
+
+	/* below is dummy ones */
+	DMA_HWID_I3C2_TX = 0xff,
+	DMA_HWID_I3C2_RX = 0xff,
 } dma_hs_per_dev_id_t;
 
 /* The step number of hardware IDs per device */
 #define SEDI_HWID_PER_DEVICE 2
+
+/*!
+ * \enum sedi_pm_pci_inst_t
+ * \brief Type of PCI device/function
+ * \ingroup sedi_driver_pm
+ */
+typedef enum {
+	SEDI_PCI_INST_FUNC_0 = 0,
+	SEDI_PCI_INST_FUNC_TOP,
+} sedi_pci_inst_t;
 
 /*!
  * \brief check if a device is owned by SoC itself

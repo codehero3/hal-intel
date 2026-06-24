@@ -19,6 +19,11 @@
 #define I2C_FIFO_DEFAULT_WATERMARK (I2C_FIFO_DEPTH / 2U)
 
 #define LBW_CLK_MHZ (sedi_pm_get_lbw_clock() / 1000000)
+#if defined(FPGA)
+#define I2C_BUS_CLEAR_DEFAULT (800000)
+#else
+#define I2C_BUS_CLEAR_DEFAULT (4000000)
+#endif
 
 enum { I2C_SPEED_STANDARD = 0, I2C_SPEED_FAST, I2C_SPEED_FAST_PLUS, I2C_SPEED_HIGH, I2C_SPEED_MAX };
 
@@ -110,7 +115,7 @@ static uint32_t regval_speed[I2C_SPEED_MAX] = {
  * For example, standard mode is 100KHz, 10000ns per period, 5000ns for
  * SCL low & high level.
  */
-#define I2C_SS_SCL_HIGH 4500
+#define I2C_SS_SCL_HIGH 4640
 #define I2C_SS_SCL_LOW 5100
 #define I2C_FS_SCL_HIGH 690
 #define I2C_FS_SCL_LOW 1650
@@ -118,6 +123,15 @@ static uint32_t regval_speed[I2C_SPEED_MAX] = {
 #define I2C_FSP_SCL_LOW 500
 #define I2C_HS_SCL_HIGH 300
 #define I2C_HS_SCL_LOW 500
+#if 0	/* currently high speed work at 1M in ISH, below are for 3.4M */
+#ifndef I2C_SCL_400PF
+#define I2C_HS_SCL_HIGH 70
+#define I2C_HS_SCL_LOW 590
+#else
+#define I2C_HS_SCL_HIGH 160
+#define I2C_HS_SCL_LOW 320
+#endif
+#endif
 
 static struct i2c_context contexts[SEDI_I2C_NUM];
 
@@ -234,6 +248,13 @@ static int dw_i2c_config_speed(uintptr_t base, int speed,
 	default:
 		return SEDI_DRIVER_ERROR_UNSUPPORTED;
 	}
+
+#if !defined(BSP_adl) && !defined(CONFIG_ISH_PLATFORM_SIMICS)
+	/* Enable bus clear feature in default */
+	SEDI_PREG_RBFV_SET(I2C, CON, BUS_CLEAR_FEATURE_CTRL, ENABLED, &i2c->con);
+	i2c->scl_stuck_at_low_timeout = I2C_BUS_CLEAR_DEFAULT;
+	i2c->sda_stuck_at_low_timeout = I2C_BUS_CLEAR_DEFAULT;
+#endif
 
 	return 0;
 }
@@ -382,9 +403,11 @@ static void dw_i2c_abort(struct i2c_context *context)
 
 	SEDI_PREG_RBFV_SET(I2C, ENABLE, ABORT, ENABLED, &i2c->enable);
 
+#ifndef CONFIG_ISH_PLATFORM_SIMICS
 	/* Waiting for abort operation finished, HW can clear */
 	SEDI_I2C_POLL_UNTIL(SEDI_PREG_RBFV_IS_SET(I2C, RAW_INTR_STAT, TX_ABRT, ACTIVE,
 				&i2c->raw_intr_stat));
+#endif
 	while (SEDI_PREG_RBFV_GET(I2C, RXFLR, RXFLR, &i2c->rxflr) != 0) {
 		value = i2c->data_cmd;
 	}
@@ -406,6 +429,15 @@ static uint32_t dw_i2c_abort_analysis(uintptr_t base)
 
 	abort_src = i2c->tx_abrt_source;
 
+#if !defined(BSP_adl) && !defined(CONFIG_ISH_PLATFORM_SIMICS)
+	/* Send recovery clock to SCL line if found SDA stuck low */
+	if (SEDI_PREG_RBFV_IS_SET(I2C, TX_ABRT_SOURCE, ABRT_SDA_STUCK_AT_LOW, ACTIVE, &abort_src)) {
+		SEDI_PREG_RBFV_SET(I2C, ENABLE, SDA_STUCK_RECOVERY_ENABLE,
+				SDA_STUCK_RECOVERY_ENABLED, &i2c->enable);
+		event |= SEDI_I2C_EVENT_BUS_ERROR;
+	}
+#endif
+
 	if (abort_src & BSETS_ABORT_SOURCE_NO_ACK) {
 		event |= SEDI_I2C_EVENT_ADDRESS_NACK;
 	}
@@ -416,6 +448,22 @@ static uint32_t dw_i2c_abort_analysis(uintptr_t base)
 
 	return event;
 }
+
+#if !defined(BSP_adl) && !defined(CONFIG_ISH_PLATFORM_SIMICS)
+#define COUNTS_PER_MS (100000)
+int32_t i2c_bus_set_clear_timeout(uintptr_t base, uint32_t timeout)
+{
+	sedi_i2c_regs_t *i2c = (void *)base;
+
+	if (timeout > 0xFFFFFFFF / COUNTS_PER_MS) {
+		return SEDI_DRIVER_ERROR_PARAMETER;
+	}
+	i2c->scl_stuck_at_low_timeout = timeout * COUNTS_PER_MS;
+	i2c->sda_stuck_at_low_timeout = timeout * COUNTS_PER_MS;
+
+	return 0;
+}
+#endif
 
 /* Used for sending cmd for I2C read operation */
 static void i2c_ask_data(sedi_i2c_t i2c_device)
@@ -596,7 +644,9 @@ int32_t sedi_i2c_init(IN sedi_i2c_t i2c_device,
 
 	init_i2c_prescale(&(context->bus_info));
 
-	context->base = base;
+	if (base != SEDI_REG_BASE_DEFAULT) {
+		context->base = base;
+	}
 
 	/* i2c default configuration */
 	context->speed = I2C_SPEED_STANDARD;
@@ -670,6 +720,8 @@ static void callback_dma_transfer(const sedi_dma_t dma, const int chan,
 
 	/* DMA error, go to end */
 	if (event != SEDI_DMA_EVENT_TRANSFER_DONE) {
+		context->status.isr = i2c->intr_stat;
+		context->status.sr = i2c->status;
 		context->status.event = i2c_event;
 		i2c_isr_complete((sedi_i2c_t)param, true);
 		return;
@@ -677,6 +729,7 @@ static void callback_dma_transfer(const sedi_dma_t dma, const int chan,
 
 	/* DMA tx_only or rx_cmd */
 	if (context->tx_dma_chan == chan) {
+		context->status.tx_dma_chn = context->tx_dma_chan;
 		/* disable tx dma */
 		context->tx_dma_chan = SEDI_I2C_DMA_CHANNEL_UNUSED;
 		SEDI_PREG_RBFV_SET(I2C, DMA_CR, TDMAE, DISABLED, &i2c->dma_cr);
@@ -690,7 +743,15 @@ static void callback_dma_transfer(const sedi_dma_t dma, const int chan,
 		i2c->data_cmd = data | (context->pending
 				? 0 : (SEDI_RBFVM(I2C, DATA_CMD, STOP, ENABLE)));
 		context->buf_index = context->buf_size;
+		/* for dma send only with no STOP, ended */
+		if ((context->rx_dma_chan == SEDI_I2C_DMA_CHANNEL_UNUSED)
+			&& (context->pending)) {
+			SEDI_I2C_POLL_UNTIL(SEDI_PREG_RBFV_IS_SET(I2C, STATUS, TFE, EMPTY,
+				&i2c->status));
+			i2c_isr_complete((sedi_i2c_t)param, false);
+		}
 	} else {
+		context->status.rx_dma_chn = context->rx_dma_chan;
 		/* disable rx dma */
 		context->rx_dma_chan = SEDI_I2C_DMA_CHANNEL_UNUSED;
 		SEDI_PREG_RBFV_SET(I2C, DMA_CR, RDMAE, DISABLED, &i2c->dma_cr);
@@ -769,7 +830,10 @@ int32_t sedi_i2c_master_write_dma(IN sedi_i2c_t i2c_device, IN uint32_t addr, IN
 
 	context->status.busy = 1U;
 	context->status.direction = 0U;
+	context->status.isr = 0U;
+	context->status.sr = 0U;
 	context->status.event = SEDI_I2C_EVENT_TRANSFER_NONE;
+	context->status.tx_dma_chn = SEDI_I2C_DMA_CHANNEL_UNUSED;
 	context->pending = pending;
 	context->buf = (void *)sedi_core_phys_to_virt((uintptr_t)data);
 	context->buf_size = num;
@@ -826,7 +890,11 @@ int32_t sedi_i2c_master_read_dma(IN sedi_i2c_t i2c_device, IN uint32_t addr, OUT
 
 	context->status.busy = 1U;
 	context->status.direction = 1U;
+	context->status.isr = 0U;
+	context->status.sr = 0U;
 	context->status.event = SEDI_I2C_EVENT_TRANSFER_NONE;
+	context->status.tx_dma_chn = SEDI_I2C_DMA_CHANNEL_UNUSED;
+	context->status.rx_dma_chn = SEDI_I2C_DMA_CHANNEL_UNUSED;
 	context->pending = pending;
 	context->buf = data;
 	context->buf_size = num;
@@ -902,6 +970,8 @@ int32_t sedi_i2c_master_write_async(IN sedi_i2c_t i2c_device, IN uint32_t addr, 
 	/* Set internal state */
 	context->status.busy = 1U;
 	context->status.direction = 0U;
+	context->status.isr = 0U;
+	context->status.sr = 0U;
 	/* Reset event to default */
 	context->status.event = SEDI_I2C_EVENT_TRANSFER_NONE;
 
@@ -957,6 +1027,8 @@ int32_t sedi_i2c_master_read_async(IN sedi_i2c_t i2c_device, IN uint32_t addr, O
 
 	context->status.busy = 1U;
 	context->status.direction = 1U;
+	context->status.isr = 0U;
+	context->status.sr = 0U;
 	/* Reset event to default */
 	context->status.event = SEDI_I2C_EVENT_TRANSFER_NONE;
 
@@ -1072,6 +1144,7 @@ int32_t sedi_i2c_control(IN sedi_i2c_t i2c_device, IN uint32_t control, IN uint3
 
 	int ret = 0;
 	struct i2c_context *context = &contexts[i2c_device];
+	sedi_i2c_bus_info_t *ext_bus_info = NULL;
 
 	switch (control) {
 	case SEDI_I2C_BUS_SPEED:
@@ -1118,6 +1191,42 @@ int32_t sedi_i2c_control(IN sedi_i2c_t i2c_device, IN uint32_t control, IN uint3
 		break;
 	case SEDI_I2C_SET_RX_MEMORY_TYPE:
 		context->rx_memory_type = arg;
+		break;
+	case SEDI_I2C_SET_BUS_CLEAR_TIMEOUT:
+#if !defined(BSP_adl) && !defined(CONFIG_ISH_PLATFORM_SIMICS)
+		i2c_bus_set_clear_timeout(context->base, (uint32_t)arg);
+#endif
+		break;
+	case SEDI_I2C_SET_BUS_DATA:
+		ext_bus_info = (sedi_i2c_bus_info_t *)arg;
+		DBG_CHECK(NULL != ext_bus_info, SEDI_DRIVER_ERROR_PARAMETER);
+		context->bus_info.std_clk.sda_hold =
+		    LBW_CLK_MHZ * ext_bus_info->std_clk.sda_hold / NS_PER_US;
+		context->bus_info.std_clk.hcnt =
+		    LBW_CLK_MHZ * ext_bus_info->std_clk.hcnt / NS_PER_US;
+		context->bus_info.std_clk.lcnt =
+		    LBW_CLK_MHZ * ext_bus_info->std_clk.lcnt / NS_PER_US;
+		context->bus_info.fst_clk.sda_hold =
+		    LBW_CLK_MHZ * ext_bus_info->fst_clk.sda_hold / NS_PER_US;
+		context->bus_info.fst_clk.hcnt =
+		    LBW_CLK_MHZ * ext_bus_info->fst_clk.hcnt / NS_PER_US;
+		context->bus_info.fst_clk.lcnt =
+		    LBW_CLK_MHZ * ext_bus_info->fst_clk.lcnt / NS_PER_US;
+		context->bus_info.fsp_clk.sda_hold =
+		    LBW_CLK_MHZ * ext_bus_info->fsp_clk.sda_hold / NS_PER_US;
+		context->bus_info.fsp_clk.hcnt =
+		    LBW_CLK_MHZ * ext_bus_info->fsp_clk.hcnt / NS_PER_US;
+		context->bus_info.fsp_clk.lcnt =
+		    LBW_CLK_MHZ * ext_bus_info->fsp_clk.lcnt / NS_PER_US;
+		context->bus_info.high_clk.sda_hold =
+		    LBW_CLK_MHZ * ext_bus_info->high_clk.sda_hold / NS_PER_US;
+		context->bus_info.high_clk.hcnt =
+		    LBW_CLK_MHZ * ext_bus_info->high_clk.hcnt / NS_PER_US;
+		context->bus_info.high_clk.lcnt =
+		    LBW_CLK_MHZ * ext_bus_info->high_clk.lcnt / NS_PER_US;
+		dw_i2c_disable(context->base);
+		dw_i2c_config_speed(context->base, context->speed,
+		       context->clk_info);
 		break;
 	default:
 		ret = SEDI_DRIVER_ERROR;
@@ -1190,12 +1299,10 @@ static void i2c_isr_complete(sedi_i2c_t i2c_device, bool is_error)
 	dw_i2c_config_txfifo(context->base, 0);
 	dw_i2c_config_rxfifo(context->base, 0);
 
-	if (context->status.event == SEDI_I2C_EVENT_TRANSFER_NONE) {
-		if (is_error) {
-			context->status.event = dw_i2c_abort_analysis(context->base);
-		} else {
-			context->status.event = SEDI_I2C_EVENT_TRANSFER_DONE;
-		}
+	if (is_error) {
+		context->status.event |= dw_i2c_abort_analysis(context->base);
+	} else {
+		context->status.event = SEDI_I2C_EVENT_TRANSFER_DONE;
 	}
 
 	/* Flush FIFO */
@@ -1232,6 +1339,8 @@ void sedi_i2c_isr_handler(IN sedi_i2c_t i2c_device)
 
 	/* If error happened, go to end*/
 	if (stat & BSETS_INTR_ERROR) {
+		context->status.isr = stat;
+		context->status.sr = regs->status;
 		i2c_isr_complete(i2c_device, true);
 		return;
 	}

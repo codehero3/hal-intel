@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Intel Corporation
+ * Copyright (c) 2023-2025 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -1233,6 +1233,7 @@ typedef struct {
 	__IO_RW uint32_t hpet_ctrl_sts;
 
 } sedi_hpet_regs_t;
+#define SEDI_HPET_REGS_T sedi_hpet_regs_t
 
 
 #endif /* _SEDI_HPET_REGS_H_ */

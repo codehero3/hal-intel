@@ -3111,5 +3111,6 @@ typedef struct {
 	__IO_RW uint32_t hh_art_timer2_mn_remainder;
 
 } sedi_misc_regs_t;
+#define SEDI_MISC_REGS_T sedi_misc_regs_t
 
 #endif /* _SEDI_MISC_REGS_H_ */

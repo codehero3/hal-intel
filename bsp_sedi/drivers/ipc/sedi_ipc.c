@@ -24,9 +24,18 @@
 #define IPC_REG_SB_LOCAL2CSE_MSG 0x40
 #define IPC_REG_SB_CSE2LOCAL_DRBL_MIRROR 0x4
 
+#define IPC_REG_SB_LOCAL2CNVI_CSR 0x698
+#define IPC_REG_SB_LOCAL2CNVI_DRBL 0x690
+#define IPC_REG_SB_LOCAL2CNVI_MSG 0x7600
+#define IPC_REG_SB_CNVI2LOCAL_DRBL_MIRROR 0x694
+
+#define IPC_REG_SB_LOCAL2BT_CSR 0x698
+#define IPC_REG_SB_LOCAL2BT_DRBL 0x690
+#define IPC_REG_SB_LOCAL2BT_MSG 0x7600
+#define IPC_REG_SB_BT2LOCAL_DRBL_MIRROR 0x694
+
 #ifdef SEDI_SB_SUPPORT
-#define SEDI_SIDEBAND_PMC SEDI_SIDEBAND_0
-#define SEDI_SIDEBAND_CSE SEDI_SIDEBAND_0
+#include "sedi_driver_sideband.h"
 #endif
 
 /*driver version*/
@@ -35,11 +44,11 @@ static const sedi_driver_version_t driver_version = { SEDI_IPC_API_VERSION,
 /* sideband params for non-host interfaces */
 #ifdef SEDI_SB_SUPPORT
 typedef struct {
-	sedi_sideband_t dev;
 	sb_port_t port;
 	uint32_t csr_peer_addr;
 	uint32_t drbl_peer_addr;
 	uint32_t msg_peer_addr;
+	uint32_t msg_peer_size;
 	uint32_t drbl_mirror_peer_addr;
 } sideband_param_t;
 #else
@@ -69,21 +78,41 @@ typedef struct {
 static sedi_ipc_capabilities_t driver_capabilities[SEDI_IPC_NUM] = { 0 };
 
 #ifdef SEDI_SB_SUPPORT
-static const sideband_param_t pmc_sb = { .dev = SEDI_SIDEBAND_PMC,
+static const sideband_param_t pmc_sb = {
 				   .port = SB_PMC,
-				   .csr_peer_addr = IPC_REG_SB_LOCAL2PMC_CSR,
+				   .csr_peer_addr = IPC_REG_SB_LOCAL2CSE_DRBL,
 				   .drbl_peer_addr = IPC_REG_SB_LOCAL2PMC_DRBL,
 				   .msg_peer_addr = IPC_REG_SB_LOCAL2PMC_MSG,
+				    .msg_peer_size = IPC_DATA_LEN_MAX,
 				   .drbl_mirror_peer_addr = IPC_REG_SB_PMC2LOCAL_DRBL_MIRROR };
-static const sideband_param_t cse_sb = { .dev = SEDI_SIDEBAND_CSE,
+static const sideband_param_t cse_sb = {
 				   .port = SB_CSME,
 				   .csr_peer_addr = IPC_REG_SB_LOCAL2CSE_CSR,
 				   .drbl_peer_addr = IPC_REG_SB_LOCAL2CSE_DRBL,
 				   .msg_peer_addr = IPC_REG_SB_LOCAL2CSE_MSG,
+				    .msg_peer_size = IPC_DATA_LEN_MAX,
 				   .drbl_mirror_peer_addr = IPC_REG_SB_CSE2LOCAL_DRBL_MIRROR };
+static const sideband_param_t cnvi_sb = {
+				    .port = SB_CNVI,
+				    .csr_peer_addr = IPC_REG_SB_LOCAL2CNVI_CSR,
+				    .drbl_peer_addr = IPC_REG_SB_LOCAL2CNVI_DRBL,
+				    .msg_peer_addr = IPC_REG_SB_LOCAL2CNVI_MSG,
+				    .msg_peer_size = IPC_DATA_LEN_MAX,
+				    .drbl_mirror_peer_addr = IPC_REG_SB_CNVI2LOCAL_DRBL_MIRROR };
+static const sideband_param_t bt_sb = {
+				  .port = SB_BT,
+				  .csr_peer_addr = IPC_REG_SB_LOCAL2BT_CSR,
+				  .drbl_peer_addr = IPC_REG_SB_LOCAL2BT_DRBL,
+				  .msg_peer_addr = IPC_REG_SB_LOCAL2BT_MSG,
+				  /* BT has larger message buffer */
+				  .msg_peer_size = 2 * IPC_DATA_LEN_MAX,
+				  .drbl_mirror_peer_addr = IPC_REG_SB_BT2LOCAL_DRBL_MIRROR };
+
 static const sideband_param_t *const sb_params[SEDI_IPC_NUM] = {
 	[SEDI_IPC_PMC] = &pmc_sb,
 	[SEDI_IPC_CSME] = &cse_sb,
+	[SEDI_IPC_CNVI] = &cnvi_sb,
+	[SEDI_IPC_BT] = &bt_sb,
 };
 #endif
 
@@ -148,7 +177,7 @@ int32_t sedi_ipc_init(IN sedi_ipc_t ipc_device, IN sedi_ipc_event_cb_t cb, INOUT
 	const sideband_param_t *sb = ipc_resource[ipc_device].sb;
 
 	if (sb) {
-		sedi_sideband_init(sb->dev);
+		sedi_sideband_init();
 	}
 #endif
 	if (SEDI_PREG_RBFV_IS_SET(IPC, ISH2AGENT_DOORBELL_AGENT, BUSY, 1,
@@ -191,7 +220,7 @@ int32_t sedi_ipc_uninit(IN sedi_ipc_t ipc_device)
 	const sideband_param_t *sb = ipc_resource[ipc_device].sb;
 
 	if (sb) {
-		sedi_sideband_uninit(sb->dev);
+		sedi_sideband_uninit();
 	}
 #endif
 	return SEDI_DRIVER_OK;
@@ -228,18 +257,19 @@ int32_t sedi_ipc_write_msg(IN sedi_ipc_t ipc_device, IN uint8_t *msg, IN int32_t
 	volatile sedi_ipc_regs_t *regs = ipc_resource[ipc_device].reg_base_addr;
 	const sideband_param_t *sb = ipc_resource[ipc_device].sb;
 
-	DBG_CHECK((size <= IPC_DATA_LEN_MAX) && (size >= 0), SEDI_DRIVER_ERROR_PARAMETER);
+	DBG_CHECK((size >= 0), SEDI_DRIVER_ERROR_PARAMETER);
 	DBG_CHECK(msg != NULL, SEDI_DRIVER_ERROR_PARAMETER);
 
 	if (sb) {
 #ifdef SEDI_SB_SUPPORT
-		/* for CSE and PMC, use sideband */
+		DBG_CHECK((size <= sb->msg_peer_size), SEDI_DRIVER_ERROR_PARAMETER);
 		for (i = 0; i < size; i = i + 4) {
-			sedi_sideband_send(sb->dev, sb->port, SEDI_SIDEBAND_ACTION_WRITE,
+			sedi_sideband_send(sb->port, SEDI_SIDEBAND_ACTION_WRITE,
 					   sb->msg_peer_addr + i, *((uint32_t *)(msg + i)));
 		}
 #endif
 	} else {
+		DBG_CHECK((size <= IPC_DATA_LEN_MAX), SEDI_DRIVER_ERROR_PARAMETER);
 		/* write data in 32-bit*/
 		for (i = 0; i < (size >> 2); i++) {
 			regs->ish2agent_msg_agent[i] = *((uint32_t *)msg + i);
@@ -271,7 +301,7 @@ int32_t sedi_ipc_write_dbl(IN sedi_ipc_t ipc_device, IN uint32_t doorbell)
 	if (sb) {
 		regs->ish2agent_doorbell_agent = doorbell;
 #ifdef SEDI_SB_SUPPORT
-		sedi_sideband_send(sb->dev, sb->port, SEDI_SIDEBAND_ACTION_WRITE,
+		sedi_sideband_send(sb->port, SEDI_SIDEBAND_ACTION_WRITE,
 				   sb->drbl_peer_addr, doorbell);
 #endif
 	} else {
@@ -300,7 +330,7 @@ int32_t sedi_ipc_write_csr(IN sedi_ipc_t ipc_device, IN uint32_t csr)
 
 	if (sb) {
 #ifdef SEDI_SB_SUPPORT
-		sedi_sideband_send(sb->dev, sb->port, SEDI_SIDEBAND_ACTION_WRITE, sb->csr_peer_addr,
+		sedi_sideband_send(sb->port, SEDI_SIDEBAND_ACTION_WRITE, sb->csr_peer_addr,
 				   csr);
 #endif
 	}
@@ -392,7 +422,7 @@ int32_t sedi_ipc_send_ack_drbl(IN sedi_ipc_t ipc_device, IN uint32_t ack)
 	if (sb) {
 #ifdef SEDI_SB_SUPPORT
 		/* the peer is PMC or CSE */
-		sedi_sideband_send(sb->dev, sb->port, SEDI_SIDEBAND_ACTION_WRITE,
+		sedi_sideband_send(sb->port, SEDI_SIDEBAND_ACTION_WRITE,
 				   sb->drbl_mirror_peer_addr, ack);
 #endif
 	} else {
@@ -481,9 +511,9 @@ int32_t sedi_ipc_read_ack_msg(IN sedi_ipc_t ipc_device, OUT uint8_t *msg, IN int
 		const sideband_param_t *sb = ipc_resource[ipc_device].sb;
 
 		for (i = 0; i < size; i = i + 4) {
-			sedi_sideband_send(sb->dev, sb->port, SEDI_SIDEBAND_ACTION_READ,
+			sedi_sideband_send(sb->port, SEDI_SIDEBAND_ACTION_READ,
 					   sb->msg_peer_addr + i, 0);
-			sedi_sideband_wait_ack(sb->dev, sb->port, SEDI_SIDEBAND_ACTION_READ,
+			sedi_sideband_wait_ack(sb->port, SEDI_SIDEBAND_ACTION_READ,
 					       (uint32_t *)(msg + i));
 		}
 #endif

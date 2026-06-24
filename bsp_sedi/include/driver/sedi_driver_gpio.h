@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Intel Corporation
+ * Copyright (c) 2023 - 2025 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -176,7 +176,7 @@ int32_t sedi_gpio_init(IN sedi_gpio_t gpio_device, IN uintptr_t base);
  * \param[in] param: User callback parameter pointer.
  * \return  \ref return_status
  */
-int32_t sedi_gpio_register_callback(IN sedi_gpio_t gpio_device, uint8_t port, uint32_t pin_mask,
+int32_t sedi_gpio_register_callback(IN sedi_gpio_t gpio_device, uint8_t port, uint32_t pin_mask, 
 				IN sedi_gpio_event_cb_t cb, INOUT void *param);
 /*!
  * \brief Uninitialize the device
@@ -343,6 +343,14 @@ void sedi_gpio_enable_interrupt(IN sedi_gpio_t gpio_device, IN uint32_t pin,
 void sedi_gpio_enable_wakeup(IN sedi_gpio_t gpio_device, IN uint32_t pin,
 			     bool enable);
 
+/*!
+ * \brief  Dump GPIO registers
+ * \param[in] gpio_device: gpio device id
+ * \param[out] ret_buf: gpio register buffer
+ * \param[out] len: register buffer length
+ */
+int32_t sedi_gpio_dump_register(IN sedi_gpio_t gpio_device,
+				INOUT uint8_t *ret_buf, INOUT uint16_t *len);
 /*!
  * \}
  */

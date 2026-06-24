@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "sedi_driver_pm.h"
+#if CONFIG_SMHI_BSP
+#include "bsp_stats.h"
+#endif
+#include <sedi_driver_pm.h>
 #include <sedi_driver_gpio.h>
-
 #include "sedi_gpio_regs.h"
 #include "sedi_soc_regs.h"
 
@@ -50,6 +52,21 @@ typedef enum {
 	SEDI_GPIO_16BITS_ACCESS,
 	SEDI_GPIO_8BITS_ACCESS
 } gpio_port_access_t;
+
+typedef struct {
+	uint32_t level[SEDI_GPIO_SOC_PORT_NUM];
+	uint32_t dir[SEDI_GPIO_SOC_PORT_NUM];
+	uint32_t redge[SEDI_GPIO_SOC_PORT_NUM];
+	uint32_t fedge[SEDI_GPIO_SOC_PORT_NUM];
+	uint32_t intm[SEDI_GPIO_SOC_PORT_NUM];
+	uint32_t ints[SEDI_GPIO_SOC_PORT_NUM];
+	uint32_t wakem[SEDI_GPIO_SOC_PORT_NUM];
+	uint32_t wakes[SEDI_GPIO_SOC_PORT_NUM];
+} dump_gpio_config_res;
+
+#if CONFIG_SMHI_BSP
+gpio_stat gpio_stat_info[ISH_PIN_NUM];
+#endif
 
 static const uint32_t gpio_port_access_mask[] = { 0xFFFFFFFFU, 0xFFFFU, 0xFFU };
 
@@ -166,6 +183,27 @@ static uint32_t gpio_read_pin_port(IN sedi_gpio_t gpio_device, IN gpio_port_acce
 	return (((reg->gplr[port] & pin_bit) >> offset) & cap.support_pins_map);
 }
 
+static void gpio_int_stats(IN uint32_t gisr, IN uint8_t port)
+{
+	uint8_t i;
+
+	for (i = 0; i < 32; i++) {
+		if ((port == 1) && (i >= (ISH_PIN_NUM - 32))) {
+			break;
+		}
+
+		if (gisr & (1 << i)) {
+#if CONFIG_SMHI_BSP
+			if (port == 0) {
+				gpio_stat_info[i].interrupts++;
+			} else if ((i + 32) < ISH_PIN_NUM) {
+				gpio_stat_info[i + 32].interrupts++;
+			}
+#endif
+		}
+	}
+}
+
 void gpio_isr(IN sedi_gpio_t gpio_device)
 {
 	sedi_gpio_regs_t *gpio = resources_map[gpio_device].reg;
@@ -188,6 +226,8 @@ void gpio_isr(IN sedi_gpio_t gpio_device)
 		/* Clear wake bit */
 		gpio->gwsr[i] = gwsr;
 
+		gpio_int_stats(gisr, i);
+
 		for (j = 0; j < GPIO_CALLBACK_COUNTS; j++) {
 			if ((context->cb_event[j] != NULL) && (context->cb_port[j] == i)) {
 				if ((context->cb_pin_mask[j] & gisr) != 0) {
@@ -196,6 +236,11 @@ void gpio_isr(IN sedi_gpio_t gpio_device)
 			}
 		}
 	}
+}
+
+SEDI_ISR_DECLARE(sedi_gpio_0_isr)
+{
+	gpio_isr(SEDI_GPIO_0);
 }
 
 sedi_driver_version_t sedi_gpio_get_version(void)
@@ -240,7 +285,7 @@ int32_t sedi_gpio_init(IN sedi_gpio_t gpio_device, IN uintptr_t base)
 	return SEDI_DRIVER_OK;
 }
 
-int32_t sedi_gpio_register_callback(IN sedi_gpio_t gpio_device, uint8_t port, uint32_t pin_mask,
+int32_t sedi_gpio_register_callback(IN sedi_gpio_t gpio_device, uint8_t port, uint32_t pin_mask, 
 				IN sedi_gpio_event_cb_t cb, INOUT void *param)
 {
 	DBG_CHECK(gpio_device < SEDI_GPIO_NUM, SEDI_DRIVER_ERROR_PARAMETER);
@@ -258,7 +303,7 @@ int32_t sedi_gpio_register_callback(IN sedi_gpio_t gpio_device, uint8_t port, ui
 		}
 	}
 
-	return SEDI_DRIVER_ERROR;
+	return SEDI_DRIVER_ERROR;	
 }
 
 int32_t sedi_gpio_uninit(IN sedi_gpio_t gpio_device)
@@ -350,6 +395,12 @@ void sedi_gpio_write_pin(IN sedi_gpio_t gpio_device, IN uint32_t pin,
 		reg->gpcr[port] = pin_bit;
 		context->outpin_state[port] &= (~pin_bit);
 	}
+
+#if CONFIG_SMHI_BSP
+	if (pin < ISH_PIN_NUM) {
+		gpio_stat_info[pin].writes++;
+	}
+#endif
 }
 
 void sedi_gpio_write_pin_8bits(IN sedi_gpio_t gpio_device, IN uint8_t group,
@@ -474,4 +525,31 @@ void sedi_gpio_enable_wakeup(IN sedi_gpio_t gpio_device, IN uint32_t pin, bool e
 	} else {
 		GPIO_CLEAR_BIT(base, gwmr, port, offset);
 	}
+}
+
+int32_t sedi_gpio_dump_register(IN sedi_gpio_t gpio_device, INOUT uint8_t *ret_buf,
+				INOUT uint16_t *len)
+{
+	if ((gpio_device >= SEDI_GPIO_NUM) || (ret_buf == NULL) || (len == NULL)) {
+		return SEDI_DRIVER_ERROR_PARAMETER;
+	}
+
+	dump_gpio_config_res *gpio_conf = (dump_gpio_config_res *)ret_buf;
+	sedi_gpio_regs_t *reg = resources_map[gpio_device].reg;
+	uint8_t i;
+
+	for (i = 0; i < SEDI_GPIO_SOC_PORT_NUM; i++) {
+		gpio_conf->level[i] = reg->gplr[i];
+		gpio_conf->dir[i] = reg->gpdr[i];
+		gpio_conf->redge[i] = reg->grer[i];
+		gpio_conf->fedge[i] = reg->gfer[i];
+		gpio_conf->intm[i] = reg->gimr[i];
+		gpio_conf->ints[i] = reg->gisr[i];
+		gpio_conf->wakem[i] = reg->gwmr[i];
+		gpio_conf->wakes[i] = reg->gwsr[i];
+	}
+
+	*len = sizeof(dump_gpio_config_res);
+
+	return SEDI_DRIVER_OK;
 }

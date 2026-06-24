@@ -132,7 +132,7 @@ static const uint8_t bit_reverse_table[] = {
 	0x3F, 0xBF, 0x7F, 0xFF
 };
 
-static void msb_lsb_convert_8bits(uint8_t *val, uint32_t len)
+void msb_lsb_convert_8bits(uint8_t *val, uint32_t len)
 {
 	uint32_t i;
 	uint8_t idx;
@@ -143,7 +143,7 @@ static void msb_lsb_convert_8bits(uint8_t *val, uint32_t len)
 	}
 }
 
-static void msb_lsb_convert_16bits(uint16_t *val, uint32_t len)
+void msb_lsb_convert_16bits(uint16_t *val, uint32_t len)
 {
 	uint32_t i;
 	uint16_t idx;
@@ -614,6 +614,7 @@ int32_t sedi_spi_get_status(IN sedi_spi_t spi_device, sedi_spi_status_t *status)
 	status->busy = context->status.busy;
 	status->data_lost = context->status.data_lost;
 	status->mode_fault = context->status.mode_fault;
+	status->isr_err = context->status.isr_err;
 	status->isr = reg->isr;
 	status->sr = reg->sr;
 	status->txflr = reg->txflr;
@@ -1234,6 +1235,7 @@ int32_t sedi_spi_transfer(IN sedi_spi_t spi_device, IN uint8_t *data_out,
 	}
 
 	context->status.busy = 1U;
+	context->status.isr_err = 0U;
 
 	context->data_tx = (void *)data_out;
 	context->data_rx = (void *)data_in;
@@ -1492,6 +1494,7 @@ void spi_isr(IN sedi_spi_t spi_device)
 	if (intr_stat & REG_INT_ERROR) {
 		error = true;
 		event = SEDI_SPI_EVENT_DATA_LOST;
+		context->status.isr_err = intr_stat;
 		context->status.data_lost = true;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Intel Corporation
+ * Copyright (c) 2023-2025 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -3490,6 +3490,7 @@ typedef struct {
 	__IO_R uint32_t comp_type;
 
 } sedi_i2c_regs_t;
+#define SEDI_I2C_REGS_T sedi_i2c_regs_t
 
 
 #endif /* _SEDI_I2C_REGS_H_ */

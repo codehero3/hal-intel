@@ -8078,5 +8078,6 @@ typedef struct {
 	__IO_RW uint32_t ccm_deepsleep;
 
 } sedi_pmu_regs_t;
+#define SEDI_PMU_REGS_T sedi_pmu_regs_t
 
 #endif /* _SEDI_PMU_REGS_H_ */

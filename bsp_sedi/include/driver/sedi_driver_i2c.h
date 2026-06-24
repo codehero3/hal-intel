@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2025 Intel Corporation
+ * Copyright (c) 2023 - 2026 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -65,6 +65,20 @@ extern "C" {
  *        driver rx buffer located in DRAM.
  */
 #define SEDI_I2C_SET_RX_MEMORY_TYPE (0x06)
+
+/*!
+ * \def SEDI_I2C_SET_BUS_CLEAR_TIMEOUT
+ * \brief Control function parameter, set bus clear feature timeout value.
+ * While do i2c transfer, timeout expires, will auto generate max 9 clock
+ * cycles to recovery I2C device.
+ */
+#define SEDI_I2C_SET_BUS_CLEAR_TIMEOUT (0x07)
+
+/*!
+ * \def SEDI_I2C_SET_BUS_DATA
+ * \brief Config bus clock frequence for each mode
+ */
+#define SEDI_I2C_SET_BUS_DATA (0x0A)
 
 /*!
  * \}
@@ -243,6 +257,14 @@ typedef volatile struct {
 	/* Event for I2C transfer */
 	uint32_t event : 13;
 	uint32_t reserved : 13;
+	/**< transfer error interrupt status */
+	uint32_t isr;
+	/**< Ro register for the current transfer status and FIFO status */
+	uint32_t sr;
+	/**< dma callback channel */
+	uint32_t tx_dma_chn;
+	/**< dma callback channel */
+	uint32_t rx_dma_chn;
 } sedi_i2c_status_t;
 
 /*!

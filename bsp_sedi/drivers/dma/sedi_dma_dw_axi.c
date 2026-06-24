@@ -88,6 +88,7 @@ typedef struct {
 #endif
 	uint8_t vnn_status;
 	uint8_t power_status;
+	uint32_t ltr_record;
 	/*other private runtime data*/
 } dma_context_t;
 
@@ -125,6 +126,8 @@ static inline void dma_vnn_req(sedi_dma_t dma_device, int channel_id)
 	unsigned int key = sedi_core_irq_lock();
 
 	if (dma_context[dma_device].vnn_status == 0) {
+		dma_context[dma_device].ltr_record = sedi_pm_get_ltr();
+		sedi_pm_set_ltr(PMC_LTR_DMA);
 		PM_VNN_DRIVER_REQ(VNN_ID_DMA0 + dma_device);
 	}
 	dma_context[dma_device].vnn_status |= BIT(channel_id);
@@ -139,6 +142,7 @@ static inline void dma_vnn_dereq(sedi_dma_t dma_device, int channel_id)
 		dma_context[dma_device].vnn_status &= (~BIT(channel_id));
 		if (dma_context[dma_device].vnn_status == 0) {
 			PM_VNN_DRIVER_DEREQ(VNN_ID_DMA0 + dma_device);
+			sedi_pm_set_ltr(dma_context[dma_device].ltr_record);
 		}
 	}
 	sedi_core_irq_unlock(key);

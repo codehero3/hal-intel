@@ -915,6 +915,7 @@ typedef struct {
 	__IO_RW uint32_t spare;
 
 } sedi_ipc_regs_t;
+#define SEDI_IPC_REGS_T sedi_ipc_regs_t
 
 
 #endif /* _SEDI_IPC_REGS_H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Intel Corporation
+ * Copyright (c) 2023-2025 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -1553,6 +1553,7 @@ typedef struct {
 	__IO_R uint32_t ctr;
 
 } sedi_uart_regs_t;
+#define SEDI_UART_REGS_T sedi_uart_regs_t
 
 
 #endif /* _SEDI_UART_REGS_H_ */

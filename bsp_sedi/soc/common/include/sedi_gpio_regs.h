@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Intel Corporation
+ * Copyright (c) 2023-2025 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -376,6 +376,7 @@ typedef struct {
 	__IO_RW uint32_t spare;
 
 } sedi_gpio_regs_t;
+#define SEDI_GPIO_REGS_T sedi_gpio_regs_t
 
 
 #endif /* _SEDI_GPIO_REGS_H_ */

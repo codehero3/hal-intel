@@ -187,6 +187,15 @@
  *   REG : a register of the only instance of a SEDI component IP.
  */
 
+ /*
+  * The pointer to the register struct of a SEDI component IP.
+  */
+#define SEDI_IREG_REGS_PTR(_comp, _instance)                                                       \
+		((SEDI_##_comp##_REGS_T *)SEDI_IREG_BASE(_comp, _instance))
+
+#define SEDI_REG_REGS_PTR(_comp)                                                                   \
+		((SEDI_##_comp##_REGS_T *)SEDI_REG_BASE(_comp))
+
 /*
  * The pointer of a SEDI register with/without const qualifier
  */

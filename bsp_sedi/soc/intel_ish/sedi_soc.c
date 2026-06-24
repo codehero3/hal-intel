@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2024 Intel Corporation
+ * Copyright (c) 2023 - 2025 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -39,6 +39,31 @@ sedi_power_state_t __attribute__((weak)) sedi_pm_get_device_power(IN sedi_devid_
 	PARAM_UNUSED(id);
 
 	return SEDI_POWER_FULL;
+}
+
+void __attribute__((weak)) sedi_pm_set_ltr(uint32_t ltr_ms)
+{
+	PARAM_UNUSED(ltr_ms);
+}
+
+uint32_t __attribute__((weak)) sedi_pm_get_ltr(void)
+{
+	return 0x0;
+}
+
+bool __attribute__((weak)) sedi_pm_in_sx(void)
+{
+	return false;
+}
+
+void __attribute__((weak)) sedi_pm_sx_enable(bool enable)
+{
+	PARAM_UNUSED(enable);
+}
+
+uint32_t __attribute__((weak)) z_tsc_divider_get(void)
+{
+	return 1;
 }
 
 uintptr_t __attribute__((weak)) sedi_core_virt_to_phys(uintptr_t virt)

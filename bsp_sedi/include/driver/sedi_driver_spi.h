@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Intel Corporation
+ * Copyright (c) 2023-2026 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -261,11 +261,12 @@ typedef volatile struct {
 	uint32_t data_lost : 1;
 	uint32_t mode_fault : 1;
 	uint32_t is_available : 1; /** 1:available 0:used by host  **/
-	uint32_t isr : 6; /* ISR status in error, only bit 0-5 is valid */
+	uint32_t isr_err : 6; /* ISR status in error, only bit 0-5 is valid */
 	uint32_t reserved : 22;
 	uint32_t txflr;
 	uint32_t rxflr;
 	uint32_t sr;
+	uint32_t isr;
 } sedi_spi_status_t;
 
 /*!
