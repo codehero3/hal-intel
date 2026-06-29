@@ -237,6 +237,8 @@ static int dw_i2c_config_speed(uint32_t base, int speed,
 	case I2C_SPEED_HIGH:
 		i2c->hs_scl_hcnt = cfg->hcnt;
 		i2c->hs_scl_lcnt = cfg->lcnt;
+		/* Demo (clean): high-speed SCL counts configured. This region
+		 * is byte-identical downstream, so this commit converges. */
 		break;
 	default:
 		return SEDI_DRIVER_ERROR_UNSUPPORTED;
