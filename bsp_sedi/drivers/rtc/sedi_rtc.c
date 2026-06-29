@@ -54,7 +54,7 @@ int sedi_rtc_uninit(void)
 int sedi_rtc_set_power(sedi_power_state_t state)
 {
 	/* Validate the requested power state (diagnostic only). */
-	INTEL_INTERNAL_ASSERT(state <= SEDI_POWER_FULL);
+	SEDI_ASSERT(state <= SEDI_POWER_FULL);
 	PARAM_UNUSED(state);
 
 	return SEDI_DRIVER_OK;
