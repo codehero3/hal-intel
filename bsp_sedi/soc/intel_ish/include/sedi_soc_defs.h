@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Intel Corporation
+ * Copyright (c) 2023-2026 Intel Corporation
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -17,11 +17,21 @@
 
 #if defined(CONFIG_ISH_PLATFORM_FPGA)
 /* ISH SoC clock is lower on FPGA than Silicon */
+#if defined(CONFIG_BOARD_ISH_5_9_RVP)
+#define SEDI_SOC_CLK_DIVISOR (8)
+#define SEDI_RTC_CLK_DIVISOR (1)
+#else
 #define SEDI_SOC_CLK_DIVISOR (5)
+#define SEDI_RTC_CLK_DIVISOR (5)
+#endif
 #endif
 
 #ifndef SEDI_SOC_CLK_DIVISOR
 #define SEDI_SOC_CLK_DIVISOR (1)
+#endif
+
+#ifndef SEDI_RTC_CLK_DIVISOR
+#define SEDI_RTC_CLK_DIVISOR (1)
 #endif
 
 #ifndef ISH_CONFIG_HBW_CLK_DIVIDER
@@ -29,8 +39,8 @@
 #endif
 
 #define SEDI_RTC_BASE_FREQ (32768)
-#define SEDI_RTC_TICKS_PER_SECOND (SEDI_RTC_BASE_FREQ / SEDI_SOC_CLK_DIVISOR)
-#define SEDI_RTC_TICKS2US(ticks) (ticks * 1000000 * SEDI_SOC_CLK_DIVISOR \
+#define SEDI_RTC_TICKS_PER_SECOND (SEDI_RTC_BASE_FREQ / SEDI_RTC_CLK_DIVISOR)
+#define SEDI_RTC_TICKS2US(ticks) (ticks * 1000000 * SEDI_RTC_CLK_DIVISOR \
 		/ SEDI_RTC_BASE_FREQ)
 
 #define SEDI_MHZ_TO_HZ(mhz) ((mhz) * 1000000)
@@ -133,23 +143,6 @@ typedef enum {
 
 #define SPI_FIFO_DEPTH (64)
 
-#if defined(CONFIG_SOC_INTEL_ISH_5_4_1) || defined(CONFIG_SOC_INTEL_ISH_5_6_0)
-#define SEDI_IRQ_HPET_TIMER_0 (14)
-#else
-#define SEDI_IRQ_HPET_TIMER_0 (17)
-#endif
-#define SEDI_IRQ_HPET_TIMER_1 (0) /* fake IRQ number, same as timer 0's */
-
-#if defined(CONFIG_SOC_INTEL_ISH_5_4_1) || defined(CONFIG_SOC_INTEL_ISH_5_6_0)
-#define SEDI_IRQ_RESET_PREP (6)
-#define SEDI_IRQ_PCIEDEV (9)
-#define SEDI_IRQ_PMU2IOAPIC (10)
-#else
-#define SEDI_IRQ_RESET_PREP (8)
-#define SEDI_IRQ_PCIEDEV (11)
-#define SEDI_IRQ_PMU2IOAPIC (12)
-#endif
-
 /*!
  * \enum vnn_id_t
  * \brief VNN ID bit for different drivers
@@ -158,19 +151,14 @@ typedef enum {
 typedef enum {
 	VNN_ID_FIRST = 0,
 	VNN_ID_AON_TASK = VNN_ID_FIRST,
-	VNN_ID_IPC_HOST_W,
-	VNN_ID_IPC_HOST_R,
-	VNN_ID_IPC_CSME_W,
-	VNN_ID_IPC_CSME_R,
-	VNN_ID_IPC_PMC_W = 5,
-	VNN_ID_IPC_PMC_R,
 	VNN_ID_DMA0,
 	VNN_ID_SIDEBAND,
-	VNN_ID_TOP,
+	VNN_ID_IPC_START,
+	VNN_ID_TOP = VNN_ID_IPC_START + SEDI_IPC_NUM * 2,
 } vnn_id_t;
 
-#define VNN_ID_IPC_CSE_R VNN_ID_IPC_CSME_R
-#define VNN_ID_IPC_CSE_W VNN_ID_IPC_CSME_W
+#define VNN_ID_IPC_R(_instance) (VNN_ID_IPC_START + (_instance) * 2)
+#define VNN_ID_IPC_W(_instance) (VNN_ID_IPC_START + (_instance) * 2 + 1)
 
 /*!
  * \enum sedi_devid_t
@@ -213,6 +201,9 @@ typedef enum {
 	DMA_HWID_SPI1_RX = 14,
 	DMA_HWID_SPI1_TX = 15,
 } dma_hs_per_dev_id_t;
+
+/* The step number of hardware IDs per device */
+#define SEDI_HWID_PER_DEVICE 2
 
 /*!
  * \brief check if a device is owned by SoC itself
