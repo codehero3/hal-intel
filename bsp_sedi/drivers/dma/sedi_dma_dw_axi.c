@@ -33,6 +33,10 @@ typedef enum {
 } dma_root_space;
 #define DT_IS_IN_DRAM (1)
 #define SR_IS_IN_DRAM (2)
+#define OSR_SRAM		0x2	/* 3(value 2) outstanding request for SRAM */
+#define OSR_DRAM		0xf	/* 16(value 15) outstanding request for DRAM */
+
+
 
 static int32_t sedi_dma_start_transfer_aux(sedi_dma_t dma_device, int channel_id, uint64_t sr_addr,
 					   uint64_t dest_addr, uint32_t length, uint8_t polling);
@@ -435,6 +439,18 @@ static int32_t dma_channel_apply_config(IN sedi_dma_t dma_device, IN int channel
 				SEDI_RBFM_VALUE(DMA, CFG2, DST_PER, config->handshake_device_id) |
 				SEDI_RBFM_VALUE(DMA, CFG2, DST_HWHS_POL,
 						config->handshake_polarity);
+		}
+		if (config->direction == DMA_MEMORY_TO_MEMORY) {
+			if (config->sr_mem_type == DMA_SRAM_MEM) {
+				chx_cfg |= SEDI_RBFM_VALUE(DMA, CFG2, SRC_OSR_LMT, OSR_SRAM);
+			} else {
+				chx_cfg |= SEDI_RBFM_VALUE(DMA, CFG2, SRC_OSR_LMT, OSR_DRAM);
+			}
+			if (config->dt_mem_type == DMA_SRAM_MEM) {
+				chx_cfg |= SEDI_RBFM_VALUE(DMA, CFG2, DST_OSR_LMT, OSR_SRAM);
+			} else {
+				chx_cfg |= SEDI_RBFM_VALUE(DMA, CFG2, DST_OSR_LMT, OSR_DRAM);
+			}
 		}
 	}
 #ifdef LINKED_LIST_SUPPORT
