@@ -33,6 +33,10 @@ typedef enum {
 } dma_root_space;
 #define DT_IS_IN_DRAM (1)
 #define SR_IS_IN_DRAM (2)
+#define OSR_SRAM		0x2	/* 3(value 2) outstanding request for SRAM */
+#define OSR_DRAM		0xf	/* 16(value 15) outstanding request for DRAM */
+
+
 
 /* OSR value limit (max_outstanding - 1). All DMA channels share one AXI master interface. */
 #define OSR_SRAM		0x2	/* 3(value+1) outstanding request for SRAM */
