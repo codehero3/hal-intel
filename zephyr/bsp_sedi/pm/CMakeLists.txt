@@ -7,4 +7,3 @@ if(CONFIG_PM)
 
   add_subdirectory(aon)
 endif()
-
