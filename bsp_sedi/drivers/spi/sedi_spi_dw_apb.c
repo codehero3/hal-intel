@@ -1053,11 +1053,11 @@ int32_t sedi_spi_dma_transfer(IN sedi_spi_t spi_device, IN uint32_t tx_dma,
 #endif
 	}
 
-	lld_spi_config_interrupt(context->base, REG_INT_ERROR);
-
 	lld_spi_dma_enable(context->base, true);
 
 	lld_spi_enable(context->base, true);
+
+	lld_spi_config_interrupt(context->base, REG_INT_ERROR);
 
 	if ((context->is_quad) && (context->quad_config)) {
 		const sedi_spi_enhanced_config_t *config = context->quad_config;
