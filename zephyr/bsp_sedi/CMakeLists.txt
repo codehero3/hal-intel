@@ -12,6 +12,7 @@ target_include_directories(intel_hal_interface INTERFACE ${BSP_SEDI_DIR}/include
 target_include_directories(intel_hal_interface INTERFACE ${BSP_SEDI_DIR}/include/driver)
 target_include_directories(intel_hal_interface INTERFACE ${BSP_SEDI_SOC_DIR}/include)
 target_include_directories(intel_hal_interface INTERFACE ${BSP_SEDI_SOC_DIR}/../common/include)
+target_include_directories(intel_hal_interface INTERFACE ${BSP_SEDI_PM_DIR}/include)
 
 if(EXISTS ${BSP_SEDI_SOC_DIR}/sedi_soc.c)
   zephyr_library_sources(${BSP_SEDI_SOC_DIR}/sedi_soc.c)
