@@ -11,4 +11,3 @@ zephyr_library_sources(${BSP_SEDI_AON_DIR}/ish_dma.c)
 zephyr_library_sources(${BSP_SEDI_AON_DIR}/ish_ipapg.S)
 
 zephyr_library_compile_options(${COMPILER_OPTIMIZE_FOR_SIZE_FLAG} -mno-80387)
-
