@@ -35,6 +35,7 @@ if(CONFIG_INTEL_HAL)
 
   set(BSP_SEDI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../bsp_sedi)
   set(BSP_SEDI_SOC_DIR ${BSP_SEDI_DIR}/soc/${SOC_FAMILY})
+  set(BSP_SEDI_PM_DIR ${BSP_SEDI_SOC_DIR}/pm)
   set(BSP_SEDI_AON_DIR ${BSP_SEDI_SOC_DIR}/pm/aon)
 
   add_subdirectory(bsp_sedi)
